@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { useTagStore } from "./tagStore";
 
 export const useApuntesStore = defineStore("apuntes", {
   state: () => ({
@@ -17,9 +18,11 @@ export const useApuntesStore = defineStore("apuntes", {
     agregarApunte(apunte) {
       this.apuntes.push(apunte);
     },
-    eliminarApunte(id) {
-      this.apuntes = this.apuntes.filter((apunte) => apunte.id !== id);
+
+    eliminarApunte(apunteId) {
+      this.apuntes = this.apuntes.filter((a) => a.id !== apunteId);
     },
+
     editarApunte(apunte) {
       const existente = this.apuntes.find((a) => a.id === apunte.id);
 
@@ -27,6 +30,6 @@ export const useApuntesStore = defineStore("apuntes", {
         existente.titulo = apunte.titulo;
         existente.contenido = apunte.contenido;
       }
-    }
+    },
   },
 });

@@ -1,6 +1,7 @@
 <script setup>
 import { useRoute } from "vue-router";
 import { ref, onMounted, onUnmounted } from "vue";
+import { useTagStore } from "@/stores/tagStore";
 
 const route = useRoute();
 

@@ -35,6 +35,7 @@ const agregarLibro = () => {
   libroStructure.value.descripcion = "";
   libroStructure.value.autor = "";
   libroStructure.value.categoria = "";
+  libroStructure.value.id = null;
 };
 
 const agregarCategoria = () => {

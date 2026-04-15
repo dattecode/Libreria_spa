@@ -1,32 +1,77 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useLibroStore } from "@/stores/libroStore";
 import { useApuntesStore } from "@/stores/apuntesStore";
 import ModalEditar from "@/components/Modal/ModalEditar.vue";
 import ModalApuntes from "@/components/Modal/ModalApuntes.vue";
 import CardApuntes from "@/components/CardApuntes.vue";
+import ModalTag from "@/components/Modal/ModalTag.vue";
+import { useTagStore } from "@/stores/tagStore";
+import ModalSelectTag from "@/components/Modal/ModalSelectTag.vue";
 
+//ruta
 const route = useRoute();
-const libroStore = useLibroStore();
-
 const idLibro = route.params.id;
+
+//libro
+const libroStore = useLibroStore();
 const libro = libroStore.getLibroById(idLibro);
 
+//tags
+const tagsStore = useTagStore();
+const tags = computed(() => {
+  if (!idLibro) return [];
+  return tagsStore.getTagByLibroId(idLibro) || [];
+});
+const tieneTags = computed(() => tags.value.length > 0);
+const tagActivo = computed(() => tagsStore.tagActivo);
+
+const puedeCrearApunte = computed(() => {
+  return tieneTags.value && tagActivo.value;
+});
+
+//apuntes por tag arreglar mañana 12.04.2026
 const apuntesStore = useApuntesStore();
-const apuntes = computed(() => apuntesStore.getApuntesByLibroId(idLibro));
+
+const apuntes = computed(() => {
+  if (!tagActivo.value) return [];
+
+  return apuntesStore.apuntes.filter((a) => a.tagId === tagActivo.value.id);
+});
+
+const cambiarTagActivo = (tag) => {
+  tagsStore.cambiarTagActivo(tag);
+};
 
 //modals
 const modalEditar = ref(false);
 const modalCrearApuntes = ref(false);
+const modalCrearTags = ref(false);
+const modalSeleccionarTag = ref(false);
 
 const toggleModalEditar = () => {
   modalEditar.value = !modalEditar.value;
 };
-
 const toggleModalCrearApuntes = () => {
   modalCrearApuntes.value = !modalCrearApuntes.value;
 };
+const toggleModalCrearTags = () => {
+  modalCrearTags.value = !modalCrearTags.value;
+};
+const toggleModalSeleccionarTag = () => {
+  modalSeleccionarTag.value = !modalSeleccionarTag.value;
+};
+
+onMounted(() => {
+  if (!tagActivo.value && tags.value.length > 0) {
+    cambiarTagActivo(tags.value[0]);
+  }
+});
+
+onUnmounted(() => {
+  tagsStore.resetTagActivo();
+});
 </script>
 
 <template>
@@ -42,11 +87,52 @@ const toggleModalCrearApuntes = () => {
         <p class="md-card__categoria">{{ libro.categoria }}</p>
         <p class="md-card__descripcion">{{ libro.descripcion }}</p>
       </div>
-
       <div class="md-card__actions">
         <button class="md-button md-button--filled" @click="toggleModalEditar">
           Editar libro
         </button>
+        <button
+          class="md-button md-button--filled"
+          @click="toggleModalCrearTags"
+        >
+          Agregar tag
+        </button>
+      </div>
+    </section>
+
+    <!-- TAGS -->
+    <section class="tags-section">
+      <div class="tags-header">
+        <h2 class="tags-header__title">Tags</h2>
+        <button
+          class="md-button md-button--filled"
+          @click="toggleModalSeleccionarTag"
+        >
+          Seleccionar tag
+        </button>
+      </div>
+
+      <!-- sin tags creados -->
+      <div v-if="tags.length === 0" class="tags-empty">
+        <span class="tags-empty__icon">🏷️</span>
+        <p class="tags-empty__text">
+          No hay tags aún. Creá al menos uno para poder agregar apuntes.
+        </p>
+      </div>
+
+      <!-- con tags: muestra solo el activo -->
+      <div v-else class="tags-active">
+        <div v-if="!tagActivo" class="tags-active__hint">
+          <span class="tags-active__hint-icon">👆</span>
+          <p class="tags-active__hint-text">
+            Seleccioná un tag para trabajar con sus apuntes.
+          </p>
+        </div>
+
+        <div v-else class="tags-active__chip">
+          <span class="tags-active__chip-dot"></span>
+          <span class="tags-active__chip-nombre">{{ tagActivo.titulo }}</span>
+        </div>
       </div>
     </section>
 
@@ -56,22 +142,26 @@ const toggleModalCrearApuntes = () => {
         <h2 class="notes-header__title">Apuntes</h2>
         <button
           class="md-button md-button--filled"
-          @click="toggleModalCrearApuntes"
+          :class="{ 'md-button--disabled': !puedeCrearApunte }"
+          :disabled="!puedeCrearApunte"
+          :title="!tagActivo ? 'Selecciona un tag primero' : ''"
+          @click="puedeCrearApunte && toggleModalCrearApuntes()"
         >
           Agregar apunte
         </button>
       </div>
 
       <div class="notes-list">
-        <!-- acá irán las cards de apuntes -->
-        <div v-if="apuntes.length === 0">
-          <p>No hay apuntes</p>
+        <div v-if="apuntes.length === 0" class="notes-empty">
+          <span class="notes-empty__icon">📝</span>
+          <p class="notes-empty__text">No hay apuntes todavía.</p>
         </div>
         <div v-else class="notes-list__cards">
           <CardApuntes
             v-for="apunte in apuntes"
             :key="apunte.id"
-            :apunte="apunte"
+            :apunte="apunte.id"
+            :idLibro="idLibro"
           />
         </div>
       </div>
@@ -109,6 +199,45 @@ const toggleModalCrearApuntes = () => {
         </div>
         <div class="modal__body">
           <ModalApuntes :idLibro="idLibro" @close="toggleModalCrearApuntes" />
+        </div>
+      </div>
+    </div>
+
+    <!-- modal crear tags -->
+    <div
+      v-show="modalCrearTags"
+      class="modal-overlay"
+      @click.self="toggleModalCrearTags"
+    >
+      <div class="modal">
+        <div class="modal__header">
+          <h3 class="modal__title">Crear tag</h3>
+          <button class="modal__close" @click="toggleModalCrearTags">✕</button>
+        </div>
+        <div class="modal__body">
+          <ModalTag :idLibro="idLibro" @close="toggleModalCrearTags" />
+        </div>
+      </div>
+    </div>
+
+    <!-- modal seleccionar tag -->
+    <div
+      v-show="modalSeleccionarTag"
+      class="modal-overlay"
+      @click.self="toggleModalSeleccionarTag"
+    >
+      <div class="modal">
+        <div class="modal__header">
+          <h3 class="modal__title">Seleccionar tag</h3>
+          <button class="modal__close" @click="toggleModalSeleccionarTag">
+            ✕
+          </button>
+        </div>
+        <div class="modal__body">
+          <ModalSelectTag
+            :idLibro="idLibro"
+            @close="toggleModalSeleccionarTag"
+          />
         </div>
       </div>
     </div>
@@ -162,13 +291,11 @@ const toggleModalCrearApuntes = () => {
   margin: 0;
   color: var(--md-sys-color-on-surface);
 }
-
 .md-card__autor {
   font-size: var(--md-sys-typescale-title-large-size);
   color: var(--md-sys-color-primary);
   margin: 0;
 }
-
 .md-card__categoria {
   font-size: var(--md-sys-typescale-body-large-size);
   color: var(--md-sys-color-on-surface-variant);
@@ -188,8 +315,122 @@ const toggleModalCrearApuntes = () => {
 }
 
 .md-card__actions {
+  display: flex;
+  gap: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--md-sys-color-outline);
+}
+
+/* TAGS */
+.tags-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 1000px;
+  margin-top: 24px;
+}
+
+.tags-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-left: 4px solid var(--md-sys-color-primary);
+  padding: 12px;
+  border-bottom: 1px solid var(--md-sys-color-outline);
+}
+
+.tags-header__title {
+  font-size: var(--md-sys-typescale-title-large-size);
+  font-weight: 500;
+  color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.tags-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: var(--md-sys-color-surface);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  box-shadow: var(--md-sys-elevation-level1);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.tags-empty__icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.tags-empty__text {
+  font-size: var(--md-sys-typescale-body-medium-size);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.tags-active {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+}
+
+.tags-active__hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.tags-active__hint-icon {
+  font-size: 16px;
+}
+
+.tags-active__hint-text {
+  font-size: var(--md-sys-typescale-body-medium-size);
+  margin: 0;
+}
+
+.tags-active__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 12px;
+  background-color: var(--md-sys-color-primary-container);
+  border-radius: var(--md-sys-shape-corner-small);
+}
+
+.tags-active__chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--md-sys-color-primary);
+  flex-shrink: 0;
+}
+
+.tags-active__chip-nombre {
+  font-size: var(--md-sys-typescale-label-large-size);
+  font-weight: 500;
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.tags-active__chip-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--md-sys-color-on-primary-container);
+  cursor: pointer;
+  transition: background 150ms;
+  flex-shrink: 0;
+}
+
+.tags-active__chip-clear:hover {
+  background: rgba(0, 0, 0, 0.1);
 }
 
 /* APUNTES */
@@ -205,7 +446,6 @@ const toggleModalCrearApuntes = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-
   border-left: 4px solid var(--md-sys-color-primary);
   padding: 12px;
   border-bottom: 1px solid var(--md-sys-color-outline);
@@ -215,6 +455,26 @@ const toggleModalCrearApuntes = () => {
   font-size: var(--md-sys-typescale-title-large-size);
   font-weight: 500;
   color: var(--md-sys-color-on-surface);
+  margin: 0;
+}
+
+.notes-empty {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background-color: var(--md-sys-color-surface);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  box-shadow: var(--md-sys-elevation-level1);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.notes-empty__icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.notes-empty__text {
+  font-size: var(--md-sys-typescale-body-medium-size);
   margin: 0;
 }
 
@@ -228,21 +488,18 @@ const toggleModalCrearApuntes = () => {
 .notes-list::-webkit-scrollbar {
   width: 8px;
 }
-
 .notes-list::-webkit-scrollbar-track {
   background: transparent;
 }
-
 .notes-list::-webkit-scrollbar-thumb {
   background-color: var(--md-sys-color-outline);
   border-radius: 8px;
 }
-
 .notes-list::-webkit-scrollbar-thumb:hover {
   background-color: var(--md-sys-color-primary);
 }
 
-.notes-list__cards{
+.notes-list__cards {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -264,7 +521,9 @@ const toggleModalCrearApuntes = () => {
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: box-shadow 200ms;
+  transition:
+    box-shadow 200ms,
+    opacity 200ms;
 }
 
 .md-button::before {
@@ -291,6 +550,12 @@ const toggleModalCrearApuntes = () => {
 }
 .md-button--filled:hover {
   box-shadow: var(--md-sys-elevation-level1);
+}
+
+.md-button--disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* MODAL */

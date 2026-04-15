@@ -1,68 +1,83 @@
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import FormInput from "./FormInput.vue";
 import FormArea from "./FormArea.vue";
 import { useApuntesStore } from "@/stores/apuntesStore";
 
 const props = defineProps({
-  apunte: {
-    type: Object,
-    required: true,
-  },
+  apunte: String, // ahora es ID
+  idLibro: String,
 });
 
 const apuntesStore = useApuntesStore();
 
+// 🔥 obtener el objeto real desde el store
+const apunteRender = computed(() => apuntesStore.getApuntesById(props.apunte));
+
 const isEditing = ref(false);
 
 const editingRef = ref({
-  titulo: props.apunte.titulo,
-  contenido: props.apunte.contenido,
+  titulo: "",
+  contenido: "",
 });
 
 const startEditing = () => {
-  // al abrir edición, sincronizamos por si el apunte cambió
-  editingRef.value.titulo = props.apunte.titulo;
-  editingRef.value.contenido = props.apunte.contenido;
+  if (!apunteRender.value) return;
+
+  editingRef.value.titulo = apunteRender.value.titulo;
+  editingRef.value.contenido = apunteRender.value.contenido;
   isEditing.value = true;
 };
 
 const cancelEditing = () => {
+  editingRef.value.titulo = "";
+  editingRef.value.contenido = "";
   isEditing.value = false;
 };
 
 const eliminar = () => {
-  apuntesStore.eliminarApunte(props.apunte.id);
+  if (!apunteRender.value) return;
+
+  apuntesStore.eliminarApunte(
+    apunteRender.value.id,
+  );
 };
 
 const guardar = () => {
-  // acá irá libroStore.editarApunte cuando la tengas
-  editingRef.value.id = props.apunte.id;
-  editingRef.value.libroId = props.apunte.libroId;
+  if (!apunteRender.value) return;
 
-  apuntesStore.editarApunte({ ...editingRef.value });
+  apuntesStore.editarApunte({
+    id: apunteRender.value.id,
+    libroId: apunteRender.value.libroId,
+    titulo: editingRef.value.titulo,
+    contenido: editingRef.value.contenido,
+  });
 
   isEditing.value = false;
 };
 </script>
 
 <template>
-  <article class="apunte-card" :class="{ 'apunte-card--editing': isEditing }">
-    <!-- ── HEADER: título + acciones ──────────────── -->
+  <!-- 🔥 protección para evitar errores -->
+  <article
+    v-if="apunteRender"
+    class="apunte-card"
+    :class="{ 'apunte-card--editing': isEditing }"
+  >
+    <!-- HEADER -->
     <div class="apunte-card__header">
-      <!-- MODO LECTURA: título como texto -->
+      <!-- LECTURA -->
       <h3 v-if="!isEditing" class="apunte-card__title">
-        {{ props.apunte.titulo }}
+        {{ apunteRender.titulo }}
       </h3>
 
-      <!-- MODO EDICIÓN: título como input -->
+      <!-- EDICIÓN -->
       <div v-else class="apunte-card__field">
         <FormInput nombre="Titulo" tipo="text" v-model="editingRef.titulo" />
       </div>
 
-      <!-- ACCIONES — cambian según el modo -->
+      <!-- ACCIONES -->
       <div class="apunte-card__actions">
-        <!-- MODO LECTURA -->
         <template v-if="!isEditing">
           <button
             class="apunte-card__btn apunte-card__btn--edit"
@@ -78,7 +93,6 @@ const guardar = () => {
           </button>
         </template>
 
-        <!-- MODO EDICIÓN -->
         <template v-else>
           <button
             class="apunte-card__btn apunte-card__btn--cancel"
@@ -96,14 +110,11 @@ const guardar = () => {
       </div>
     </div>
 
-    <!-- ── CONTENIDO ────────────────────────────── -->
-
-    <!-- MODO LECTURA: contenido como texto -->
+    <!-- CONTENIDO -->
     <p v-if="!isEditing" class="apunte-card__content">
-      {{ props.apunte.contenido }}
+      {{ apunteRender.contenido }}
     </p>
 
-    <!-- MODO EDICIÓN: contenido como textarea -->
     <div v-else class="apunte-card__field">
       <FormArea nombre="Contenido" v-model="editingRef.contenido" />
     </div>

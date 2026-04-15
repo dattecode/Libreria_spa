@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { v4 as uuidv4 } from 'uuid';
 import { useApuntesStore } from '@/stores/apuntesStore';
+import { useTagStore } from '@/stores/tagStore';
 import FormInput from '../FormInput.vue';
 import FormArea from '../FormArea.vue';
 
@@ -10,6 +11,7 @@ const props = defineProps({
 });
 
 const apuntesStore = useApuntesStore();
+const tagStore = useTagStore();
 
 const emit = defineEmits(['close']);
 
@@ -17,7 +19,8 @@ const apunteRef = ref({
   id: null,
   titulo: "",
   contenido: "",
-  libroId: null
+  libroId: null,
+  tagId: null,
 });
 
 const guardarApunte = () => {
@@ -27,13 +30,22 @@ const guardarApunte = () => {
     return;
   }
 
+  if (!tagStore.tagActivo) {
+  alert("Debes seleccionar un tag");
+  return;
+}
+
   apunteRef.value.id = uuidv4();
   apunteRef.value.libroId = props.idLibro;
+  apunteRef.value.tagId = tagStore.tagActivo?.id;
+
   // acá irá la acción de la store
   apuntesStore.agregarApunte({ ...apunteRef.value });
 
   apunteRef.value.titulo = "";
   apunteRef.value.contenido = "";
+  apunteRef.value.id = null;
+  apunteRef.value.tagId = null;
 
   emit('close');
 };

@@ -3,26 +3,33 @@ import { defineStore } from "pinia";
 export const useTagStore = defineStore("tag", {
   state: () => ({
     tags: [],
+    tagActivo: null,
   }),
 
   getters: {
     getTotalTags: (state) => state.tags.length,
-    getTagById: (state) => 
-      (id) => state.tags.find((tag) => tag.id === id),
-    getTagByLibroId: (state) =>
-      (idLibro) => state.tags.find((tag) => tag.idLibro === idLibro),
+    getTagById: (state) => (id) => state.tags.find((tag) => tag.id === id),
+    getTagByLibroId: (state) => (idLibro) =>
+      state.tags.filter((tag) => tag.idLibro === idLibro),
   },
 
   actions: {
-    addTag(tag) {
+    agregarTag(tag) {
       this.tags.push(tag);
+    },
+
+    cambiarTagActivo(tag) {
+      this.tagActivo = tag;
+    },
+
+    resetTagActivo() {
+      this.tagActivo = null;
     },
   },
 });
 
 const structureTag = {
-  id: tag.id,
-  titulo: tag.titulo,
-  idLibro: tag.idLibro,
-  apuntesId: [],
+  id: null,
+  titulo: "",
+  idLibro: null,
 };
